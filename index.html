@@ -1,0 +1,578 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swartruggens Service Delivery Ticketing System</title>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        header {
+            grid-column: 1 / -1;
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #map {
+            height: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #dashboard {
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        .category-card {
+            border-left: 4px solid;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .gauge-container {
+            display: flex;
+            flex-wrap: wrap;
+            background: white,
+            padding: 1rem,
+            border-radius: 8px,
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1),
+            margin-bottom: 1rem;
+        }
+        .gauge {
+            width: calc(50% - 1rem);
+            margin: 0.5rem 1rem;
+            text-webkit-box-sizing: border-box;
+            box-sizing: border-box;
+            color: #333;
+        }
+        .gauge-title {
+            font-size: 1.125rem;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        .category-color-indicator {
+            width: 12.5rem;
+            height: 0.5rem;
+            display: inline-block;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        .gauge-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .ticket-list {
+            margin-top: 2rem;
+        }
+        .ticket {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .ticket:hover {
+            background-color: #f9f9f9;
+        }
+        .resolved {
+            opacity: 0.6;
+        }
+        .ticket-title {
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+        }
+        .form-container {
+            padding: 1rem;
+            background-color: #fff;
+            border-radius: 8px;
+            margin-top: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        form input, form select, form textarea {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        form button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .category-colors {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .category-color {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        /* Add these new styles */
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 0.5rem;
+        }
+        .ticket-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        /* Mobile responsiveness */
+        /*@media (max-width: 600px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            #map {
+                
+            }
+        }*/
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Swartruggens Service Delivery Ticketing System</h1>
+            <p>Report and track municipal service delivery issues</p>
+        </header>
+        
+        <div id="map"></div>
+        
+        <div id="dashboard">
+            <h2>Service Delivery Dashboard</h2>
+            
+            <div class="gauge-container" id="gauges"></div>
+            
+            <div class="tabs">
+                <button class="active" data-tab="active">Active Tickets</button>
+                <button data-tab="resolved">Resolved Tickets</button>
+                <button data-tab="report">Report Issue</button>
+            </div>
+            
+            <div class="tab-content active" id="active-tickets">
+                <div id="ticket-list" class="ticket-list"></div>
+            </div>
+            
+            <div class="tab-content" id="resolved-tickets">
+                <div id="resolved-list" class="ticket-list"></div>
+            </div>
+            
+            <div class="tab-content form-container" id="report-form">
+                <h3>Report a New Issue</h3>
+                <form id="new-ticket-form">
+                    <input type="text" id="reporter-name" placeholder="Your name" required>
+                    <input type="text" id="title" placeholder="Brief description of the issue" required>
+                    <select id="category" required>
+                        <option value="">Select category</option>
+                        <option value="electricity">Electricity</option>
+                        <option value="water">Water</option>
+                        <option value="roads">Roads</option>
+                        <option value="waste">Waste Management</option>
+                        <option value="health">Health Services</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <textarea id="description" rows="4" placeholder="Detailed description of the issue" required></textarea>
+                    <div>
+                        <label for="location">Click on the map to set location or enter coordinates:</label>
+                        <input type="text" id="location" readonly>
+                    </div>
+                    <button type="submit">Submit Ticket</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const room = new WebsimSocket();
+        
+        // Categories configuration
+        const categories = {
+            electricity: { name: 'Electricity', color: '#f39c12', letter: 'B' },
+            water: { name: 'Water', color: '#3498db', letter: 'A' },
+            roads: { name: 'Roads', color: '#e74c3c', letter: 'C' },
+            waste: { name: 'Waste Management', color: '#9b59b6', letter: 'B' },
+            health: { name: 'Health Services', color: '#2ecc71', letter: 'A-' },
+            other: { name: 'Other', color: '#95a5a6', letter: 'D' }
+        };
+
+        // Random names for mock data
+        const names = ["John Doe", "", "Zanele M", "Elias", "Mandla", "Kagiso", "Lebo", "Pieter", " ", "Vuyo"];
+
+        // Initialize the map
+        const map = L.map('map').setView([-25.65083, 26.69277], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let markers = [];
+        let selectedLocation = null;
+
+        // Add mock data
+        const MockTickets = [
+            {
+                title: "Street light outage",
+                category: "electricity",
+                description: "Three street lights out for past week",
+                location: "-25.65183,26.693",
+                resolved: false,
+                reporter: names[Math.floor(Math.random() * names.length)],
+                created_at: new Date(1685553600000).toISOString(),
+                timestamp: 1685553600000
+            },
+            {
+                title: "Pothole on Main St",
+                category: "roads",
+                description: "Large pothole forming at Main Street intersection",
+                location: "-25.649,26.694",
+                resolved: false,
+                reporter: names[Math.floor(Math.random() * names.length)],
+                created_at: new Date(1685553600000 + 3600000).toISOString(),
+                timestamp: 1685553600000 + 3600000
+            },
+            {
+                title: "Water leak",
+                category: "water",
+                description: "Constant water leak in front of main square",
+                location: "-25.652,26.691",
+                resolved: false,
+                reporter: names[Math.floor(Math.random() * names.length)],
+                created_at: new Date(1685553600000 + 7200000).toISOString(),
+                timestamp: 1685553600000 + 7200000
+            },
+            {
+                title: "Uncollected garbage",
+                category: "waste",
+                description: "Uncollected garbage for weeks",
+                location: "-25.653,26.690",
+                resolved: false,
+                reporter: names[Math.floor(Math.random() * names.length)],
+                created_at: new Date(1685553600000 + 10800000).toISOString(),
+                timestamp: 1685553600000 + 10800000
+            }
+        ];
+
+        // Function to seed mock data
+        async function seedMockData() {
+            if (room.collection('ticket').getList().length === 0) {  
+                console.log("Adding mock tickets...");
+                for (const ticket of MockTickets) {
+                    try {
+                        await room.collection('ticket').create(ticket);
+                    } catch (error) {
+                        console.error('Error seeding ticket:', error);
+                    }
+                }
+            }
+        }
+
+        // Handle map clicks
+        map.on('click', function(e) {
+            if (selectedLocation) {
+                map.removeLayer(selectedLocation);
+            }
+            selectedLocation = L.marker(e.latlng).addTo(map)
+                .bindPopup('Selected location for new ticket').openPopup();
+            document.getElementById('location').value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+        });
+
+        // Function to calculate grades (mock data for now)
+        function calculateGrades() {
+            const tickets = room.collection('ticket').getList();
+            const activeTickets = tickets.filter(t => !t.resolved);
+            
+            // Count tickets per category
+            const counts = {};
+            for (const category in categories) {
+                counts[category] = activeTickets.filter(t => t.category === category).length;
+            }
+            
+            // Mock calculation - in a real app you'd have more sophisticated metrics
+            const grades = {};
+            for (const category in categories) {
+                const count = counts[category];
+                if (count === 0) grades[category] = 'A+';
+                else if (count < 3) grades[category] = 'A';
+                else if (count < 5) grades[category] = 'B';
+                else if (count < 10) grades[category] = 'C';
+                else grades[category] = 'D';
+            }
+            
+            return grades;
+        }
+
+        // Render gauges
+        function renderGauges() {
+            const grades = calculateGrades();
+            const container = document.getElementById('gauges');
+            container.innerHTML = '';
+            
+            for (const category in categories) {
+                const grade = grades[category];
+                
+                const gaugeDiv = document.createElement('div');
+                gaugeDiv.className = 'gauge-card';
+                gaugeDiv.innerHTML = `
+                    <div class="card gauge-title">
+                        <span class="color-indicator" style="background: #${categories[category].color}"></span>
+                        ${categories[category].name}
+                    </div>
+                    <div>
+                        <canvas id="gauge-${category}" width="210" height="140"></canvas>
+                        Grade: <span class="grade-value">${grade}</span>
+                    </div>
+                    <div class="performance">${grade === 'A+' ? 'Outstanding' : grade <= 'B' ? 'Satisfactory' : grade <= 'D' ? 'Poor' : 'Critical'}</div>
+                `;
+                container.appendChild(gaugeDiv);
+                
+                // Render gauge chart
+                const ctx = document.getElementById(`gauge-${category}`).getContext('2d');
+                const value = 100 - (25 * (grade.charCodeAt(0) - 65)); // Convert grade to value
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [value, 100 - value],
+                            backgroundColor: [categories[category].color, '#eee'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '70%',
+                        rotation: -90,
+                        circumference: 180,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Render tickets
+        function renderTickets() {
+            const tickets = room.collection('ticket').getList();
+            
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Separate active and resolved tickets
+            const activeTickets = tickets.filter(t => !t.resolved);
+            const resolvedTickets = tickets.filter(t => t.resolved);
+            
+            // Render active tickets
+            const activeList = document.getElementById('ticket-list');
+            activeList.innerHTML = '';
+            activeTickets.forEach(ticket => {
+                const ticketDiv = document.createElement('div');
+                ticketDiv.className = 'ticket';
+                ticketDiv.innerHTML = `
+                    <div class="ticket-title">
+                        <span>${ticket.title}</span>
+                        <span class="badge" style="background-color: ${categories[ticket.category].color}">
+                            ${categories[ticket.category].name}
+                        </span>
+                    </div>
+                    <div>${ticket.description}</div>
+                    <div style="font-size: 0.8rem; color: #777; margin-top: 0.5rem;">
+                        Reported by ${ticket.reporter || "Anonymous"} on ${new Date(ticket.created_at).toLocaleString()}
+                    </div>
+                    <div class="ticket-actions">
+                        <button data-id="${ticket.id}" class="resolve-btn">Mark as Resolved</button>
+                    </div>
+                `;
+                activeList.appendChild(ticketDiv);
+                
+                // Add marker to map
+                const [lat, lng] = ticket.location.split(',').map(Number);
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'custom-icon',
+                        html: `<div style="background-color: ${categories[ticket.category].color}; 
+                                width: 24px; height: 24px; border-radius: 50%; border: 2px solid white;
+                                display: flex; align-items: center; justify-content: center;
+                                color: white; font-weight: bold;">${categories[ticket.category].letter}</div>`
+                    })
+                }).addTo(map)
+                .bindPopup(`
+                    <strong>${ticket.title}</strong><br>
+                    Category: ${categories[ticket.category].name}<br>
+                    ${ticket.description}
+                `);
+                markers.push(marker);
+            });
+            
+            // Render resolved tickets
+            const resolvedList = document.getElementById('resolved-list');
+            resolvedList.innerHTML = '';
+            resolvedTickets.forEach(ticket => {
+                const ticketDiv = document.createElement('div');
+                ticketDiv.className = 'ticket resolved';
+                ticketDiv.innerHTML = `
+                    <div class="ticket-title">
+                        <span>${ticket.title}</span>
+                        <span class="badge" style="background-color: ${categories[ticket.category].color}">
+                            ${categories[ticket.category].name}
+                        </span>
+                    </div>
+                    <div>${ticket.description}</div>
+                    <div style="font-size: 0.8rem; color: #777; margin-top: 0.5rem;">
+                        Reported by ${ticket.reporter || "Anonymous"}, resolved on ${new Date(ticket.resolved_at).toLocaleString()}
+                    </div>
+                `;
+                resolvedList.appendChild(ticketDiv);
+            });
+            
+            // Add event listeners to resolve buttons
+            document.querySelectorAll('.resolve-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const ticketId = this.getAttribute('data-id');
+                    await room.collection('ticket').update(ticketId, {
+                        resolved: true,
+                        resolved_at: new Date().toISOString()
+                    });
+                });
+            });
+        }
+
+        // Handle new ticket form submission
+        document.getElementById('new-ticket-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const reporterName = document.getElementById('reporter-name').value;
+            const title = document.getElementById('title').value;
+            const category = document.getElementById('category').value;
+            const description = document.getElementById('description').value;
+            const location = document.getElementById('location').value;
+            
+            if (!location) {
+                alert('Please select a location on the map');
+                return;
+            }
+            
+            try {
+                await room.collection('ticket').create({
+                    title,
+                    category,
+                    description,
+                    location,
+                    resolved: false,
+                    reporter: reporterName
+                });
+                
+                // Reset form
+                this.reset();
+                if (selectedLocation) {
+                    map.removeLayer(selectedLocation);
+                    selectedLocation = null;
+                }
+                
+                // Show active tickets tab
+                document.querySelector('.tabs button[data-tab="active"]').click();
+            } catch (error) {
+                console.error('Error creating ticket:', error);
+                alert('Error creating ticket. Please try again.');
+            }
+        });
+
+        // Tab switching functionality
+        document.querySelectorAll('.tabs button').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.tabs button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${this.dataset.tab}-tickets`).classList.add('active');
+            });
+        });
+
+        // Subscribe to ticket changes
+        room.collection('ticket').subscribe(function(tickets) {
+            renderTickets();
+            renderGauges();
+        });
+
+        // Initialize app
+        seedMockData().then(() => { 
+            renderGauges();
+            renderTickets();
+        });   
+
+        // Legend
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = '<strong>Legend</strong><br>';
+            
+            for (const category in categories) {
+                div.innerHTML += `
+                    <div class="category-color">
+                        <div class="color-box" style="background-color: ${categories[category].color}"></div>
+                        ${categories[category].name} (${categories[category].letter})
+                    </div>
+                `;
+            }
+            
+            return div;
+        };
+        legend.addTo(map);
+    </script>
+</body>
+</html>
